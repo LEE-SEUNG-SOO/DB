@@ -114,7 +114,7 @@ AND gender = 'M';
 
 -- Q23) 1990년에 출생한 남자 고객의 이름, 아이디, 성별, 지역, 전화번호, 생일, 포인트를 조회하세요.
 --      단, 홍길동(gildong) 형태로 이름과 아이디를 묶어서 조회하세요.
-SELECT concat(customer_name,"(",customer_id,")") as name, gender, city, phone, birth_date, point
+SELECT concat(customer_name, "(", customer_id, ")") as name, gender, city, phone, birth_date, point
 FROM customer
 WHERE birth_date like '1990%'
 AND gender = 'M';
@@ -156,3 +156,147 @@ FROM order_header
 WHERE order_date BETWEEN "2019-01-01" AND "2019-01-07"
 ORDER BY order_id ASC, order_date DESC;
 
+/**
+	그룹함수
+**/
+/** customer 테이블 사용 **/
+-- Q01) 고객의 포인트 합을 조회하세요.
+SELECT format(sum(point), 0) as sum
+FROM customer;
+
+-- Q02) '서울' 지역 고객의 포인트 합을 조회하세요.
+SELECT format(sum(point), 0) as sum
+FROM customer
+WHERE city = '서울';
+
+-- Q03) '서울' 지역 고객의 수를 조회하세요.
+SELECT count(customer_name) as count
+FROM customer
+WHERE city = '서울';
+
+-- Q04) '서울' 지역 고객의 포인트 합과 평균을 조회하세요.
+SELECT format(sum(point), 0) as sum,
+		format(avg(point), 0) as avg
+FROM customer
+WHERE city = '서울';
+     
+-- Q05) '서울' 지역 고객의 포인트 합, 평균, 최댓값, 최솟값을 조회하세요.
+SELECT format(sum(point), 0) as sum,
+		format(avg(point), 0) as avg,
+        format(max(point), 0) as max,
+        format(min(point), 0) as min
+FROM customer
+WHERE city = '서울';
+
+-- Q06) 남녀별 고객의 수를 조회하세요.
+SELECT gender, count(gender) as count
+FROM customer
+GROUP BY gender;
+
+-- Q07) 지역별 고객의 수를 조회하세요.
+--      단, 지역 이름을 기준으로 오름차순 정렬해서 조회하세요.
+SELECT city, count(city) as count
+FROM customer
+GROUP BY city
+ORDER BY city ASC;
+ 
+-- Q08) 지역별 고객의 수를 조회하세요.
+--      단, 고객의 수가 10명 이상인 행만 지역 이름을 기준으로 오름차순 정렬해서 조회하세요.
+SELECT city, count(city) as count
+FROM customer
+GROUP BY city
+HAVING count >= 10
+ORDER BY city ASC;
+    
+-- Q09) 남녀별 포인트 합을 조회하세요.
+SELECT gender, format(sum(point),0) as sum
+FROM customer
+GROUP BY gender;
+    
+-- Q10) 지역별 포인트 합을 조회하세요.
+--      단, 지역 이름을 기준으로 오름차순 정렬해서 조회하세요.
+SELECT city, format(sum(point),0) as sum
+FROM customer
+GROUP BY city
+ORDER BY city ASC;
+    
+-- Q11) 지역별 포인트 합을 조회하세요.
+--      단, 포인트 합이 1,000,000 이상인 행만 포인트 합을 기준으로 내림차순 정렬해서 조회하세요.
+SELECT city, format(sum(point),0) as sum
+FROM customer
+GROUP BY city
+HAVING sum(point) > 1000000
+ORDER BY sum(point) DESC;
+
+-- Q12) 지역별 포인트 합을 조회하세요.
+--      단, 포인트 합을 기준으로 내림차순 정렬해서 조회하세요.
+SELECT city, format(sum(point),0) as sum
+FROM customer
+GROUP BY city
+ORDER BY sum(point) DESC;
+
+-- Q13) 지역별 고객의 수, 포인트 합을 조회하세요.
+--      단, 지역 이름을 기준으로 오름차순 정렬해서 조회하세요.
+SELECT city,
+		count(city) as count,
+		format(sum(point),0) as sum
+FROM customer
+GROUP BY city
+ORDER BY city ASC;
+
+-- Q14) 지역별 포인트 합, 포인트 평균을 조회하세요.
+--      단, 포인트가 NULL이 아닌 고객을 대상으로 하며, 지역 이름을 기준으로 오름차순 정렬해서 조회하세요.
+SELECT city,
+		format(sum(point),0) as sum,
+		format(avg(point),0) as avg
+FROM customer
+WHERE point IS NOT NULL
+GROUP BY city
+ORDER BY city ASC;
+
+-- Q15) '서울', '부산', '대구' 지역 고객의 지역별, 남녀별 포인트 합과 평균을 조회하세요.
+--      단, 지역 이름을 기준으로 오름차순, 같은 지역은 성별을 기준으로 오름차순 정렬해서 조회하세요.
+SELECT city,
+		gender,
+		format(sum(point),0) as sum
+FROM customer
+WHERE city IN('서울','부산','대구')
+GROUP BY city, gender
+ORDER BY city ASC;
+
+/** order_header 테이블 사용 **/
+show tables;
+
+-- Q16) 2019년 1월 주문에 대하여 고객아이디별 전체금액 합을 조회하세요.
+SELECT *
+FROM order_header;
+
+-- Q17) 주문연도별 전체금액 합계를 조회하세요.
+SELECT LEFT(order_date,4) as year,
+		format(sum(total_due),0)
+FROM order_header
+GROUP BY year;
+
+select * from order_header;
+
+-- Q18) 2019.01 ~ 2019.06 기간 주문에 대하여 주문연도별, 주문월별 전체금액 합을 조회하세요.
+SELECT LEFT(order_date,7) as day,
+		format(sum(total_due),0) as sum
+FROM order_header
+WHERE LEFT(order_date,7) BETWEEN '2019-01' AND '2019-06'
+GROUP by LEFT(order_date,7);
+
+-- Q19) 2019.01 ~ 2019.06 기간 주문에 대하여 주문연도별, 주문월별 전체금액 합과 평균을 조회하세요.
+SELECT LEFT(order_date,7) as day,
+		format(sum(total_due),0) as sum,
+        format(avg(total_due),0) as avg
+FROM order_header
+WHERE LEFT(order_date,7) BETWEEN '2019-01' AND '2019-06'
+GROUP by LEFT(order_date,7);
+
+-- Q20) 주문연도별, 주문월별 전체금액 합과 평균을 조회하고, rollup 함수를 이용하여 소계와 총계를 출력해주세요.
+SELECT LEFT(order_date,7) as day,
+		format(sum(total_due),0) as sum,
+        format(avg(total_due),0) as avg
+FROM order_header
+GROUP by LEFT(order_date,7) with rollup;
