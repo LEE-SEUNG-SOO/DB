@@ -216,6 +216,10 @@ SELECT emp_id, emp_name
 FROM employee
 WHERE emp_id = (SELECT emp_id FROM employee WHERE emp_name = "홍길동");
 
+
+
+/*******************************************************************
+-- 서버 환경에 따라 위,아래 쿼리중 효율적인 쿼리 사용.
 -- 인사과에 속한 사원들 중에 휴가를 사용한 사원들의 내역을 조회
 SELECT *
 FROM employee e, department d, vacation v
@@ -231,3 +235,216 @@ WHERE e.dept_id = d.dept_id
 AND e.emp_id = v.emp_id
 AND d.dept_name = '인사'
 ORDER BY e.emp_id;
+
+*******************************************************************/
+
+/*******************************************************************
+	서브쿼리(SubQuery) : 메인 쿼리에 다른 쿼리를 추가하여 실행하는 방식
+    형식 : SELECT [컬럼명 : (스칼라서브쿼리)] < 사용하지 말것
+			FROM [테이블 : (인라인뷰)] < 별칭 반드시 필요
+            WHERE [조건 (서브쿼리)]    
+*******************************************************************/
+
+-- [스칼라 서브쿼리]
+-- 정보시스템 부서명의 사원들을 모두 조회
+-- 사번, 사원명, 부서아이디, 부서명(부서테이블), 급여, 폰번호
+SELECT emp_id,
+		emp_name,
+        dept_id,
+        (SELECT dept_name FROM department WHERE dept_name = '정보시스템') AS dept_name, -- 권장X
+        phone,
+        salary
+FROM employee
+WHERE dept_id = 
+(SELECT dept_id
+FROM department
+WHERE dept_name = '정보시스템');
+
+-- [서브쿼리 : 단일행]
+-- 정보시스템 부서명의 사원들을 모두 조회
+SELECT *
+FROM employee
+WHERE dept_id = 
+	(SELECT dept_id
+		FROM department
+		WHERE dept_name = '정보시스템');
+
+-- 홍길동사원이 속한 부서명을 조회
+-- '='로 조건절 비교하는 경우 :: 단일행 서브쿼리
+SELECT *
+FROM department
+WHERE dept_id =
+	(SELECT dept_id 
+		FROM employee
+		WHERE emp_name = '홍길동');
+
+-- 홍길동 사원의 휴가사용 내역을 조회
+SELECT *
+FROM vacation
+WHERE emp_id = 
+	(SELECT emp_id
+		FROM employee 
+		WHERE emp_name ='홍길동');
+
+-- 제 3본부에 속한 모든 부서를 조회
+SELECT *
+FROM department
+WHERE unit_id =
+	(SELECT unit_id
+		FROM unit
+		WHERE unit_name = '제3본부');
+
+-- 급여가 가장 높은 사원의 정보 조회
+SELECT *
+FROM employee
+WHERE salary = 
+	(SELECT MAX(salary) AS salary
+		FROM employee);
+
+-- 가장 빨리 입사한 사원의 정보 조회
+SELECT *
+FROM employee
+WHERE hire_date =
+	(SELECT MIN(hire_date) AS hire_date
+		FROM employee);
+
+-- [서브 쿼리 : 다중행 - IN]
+-- 제3본부에 속한 모든 사원 정보 조회
+SELECT *
+FROM employee
+WHERE dept_id IN
+	(SELECT dept_id
+		FROM department
+		WHERE unit_id =
+			(SELECT unit_id
+				FROM unit
+				WHERE unit_name = '제3본부')
+		);
+
+-- 제3본부에 속한 모든 사원들의 휴가 사용 내역 조회
+SELECT *
+FROM vacation
+WHERE emp_id IN
+	(SELECT emp_id
+		FROM employee
+		WHERE dept_id IN
+			(SELECT dept_id
+				FROM department
+				WHERE unit_id =
+					(SELECT unit_id
+						FROM unit
+						WHERE unit_name = '제3본부')
+				));
+                
+-- [ 인라인뷰 : 메인쿼리의 테이블 자리에 들어가는 서브쿼리 ]
+-- 휴가를 사용한 사원정보만 사원별 휴가사용 일수를 그룹핑하여
+-- 사원아이디, 사원명, 입사일, 연봉, 휴가사용일수를 조회
+SELECT e.emp_id, e.emp_name, e.hire_date, e.salary, v.duration
+FROM employee e, (SELECT emp_id, count(*) AS count , sum(duration) AS duration
+					FROM vacation
+					GROUP BY emp_id) v -- 별칭 반드시 필요
+WHERE e.emp_id = v.emp_id;
+
+-- 전체 사원별 휴가사용 일수를 그룹핑하여
+-- 사원아이디, 사원명, 입사일, 연봉, 휴가사용일수를 조회
+-- 휴가를 사용하지 않은 사원은 기본값 0
+-- 사용 일수 기준 내림차순 정렬
+SELECT e.emp_id, e.emp_name, e.hire_date, e.salary, IFNULL(v.duration,0) as duration
+FROM employee e
+LEFT OUTER JOIN (SELECT emp_id, count(*) AS count , sum(duration) AS duration
+					FROM vacation
+					GROUP BY emp_id) v -- 별칭 반드시 필요
+ON e.emp_id = v.emp_id
+ORDER BY duration DESC;
+
+-- 2016 ~ 2017년도 입사한 사원들의 정보 출력
+-- vacation 테이블을 인라인뷰 형태로 조인하여 휴가 사용 내역 출력
+SELECT *
+FROM (SELECT emp_id, emp_name, gender, hire_date, dept_id, phone, email, salary
+		FROM employee
+		WHERE LEFT(hire_date,4) 
+		BETWEEN 2016 AND 2017) e, vacation v
+WHERE e.emp_id = v.emp_id;
+
+-- 부서별 총급여, 평균급여를 구하여 총 급여가 30000이상인 부서 조회
+-- employee 테이블을 인라인뷰 형태로 조인
+-- 사원아이디, 사원명, 급여, 부서아이디, 부서명, 부서별 총급여, 평균급여 출력
+SELECT e.emp_id, e.emp_name, e.salary, e.dept_id, d.dept_name, t.sum, t.avg
+FROM employee e, department d, 
+		(SELECT dept_id, sum(salary) AS sum, avg(salary) AS avg
+					FROM employee
+					GROUP BY dept_id
+                    HAVING sum >= 30000) t
+WHERE e.dept_id = d.dept_id 
+AND e.dept_id = t.dept_id;
+
+
+/*******************************************************************
+	테이블 결과 합치기 : union, union all
+    형식 : 쿼리1 실행 결과 union 쿼리2 실행 결과
+	형식 : 쿼리1 실행 결과 union all 쿼리2 실행 결과
+    ※※ 실행결과 컬럼이 동일(컬럼명, 데이터타입)
+    union = 중복 제거
+    union all = 중복 허용
+*******************************************************************/
+-- 영업부, 정보시스템 부서의 사원 아이디, 사원명, 급여, 부서아이디 조회
+-- union 중복 불가
+SELECT emp_id, emp_name, salary, dept_id
+FROM employee
+WHERE dept_id = (SELECT dept_id FROM department WHERE dept_name ='영업')
+union 
+SELECT emp_id, emp_name, salary, dept_id
+FROM employee
+WHERE dept_id = (SELECT dept_id FROM department WHERE dept_name ='정보시스템')
+union
+SELECT emp_id, emp_name, salary, dept_id
+FROM employee
+WHERE dept_id = (SELECT dept_id FROM department WHERE dept_name ='영업');
+
+-- union all 중복 허용
+SELECT emp_id, emp_name, salary, dept_id
+FROM employee
+WHERE dept_id = (SELECT dept_id FROM department WHERE dept_name ='영업')
+union all
+SELECT emp_id, emp_name, salary, dept_id
+FROM employee
+WHERE dept_id = (SELECT dept_id FROM department WHERE dept_name ='정보시스템')
+union all
+SELECT emp_id, emp_name, salary, dept_id
+FROM employee
+WHERE dept_id = (SELECT dept_id FROM department WHERE dept_name ='영업');
+
+/*******************************************************************
+	논리적인 테이블 : VIEW(뷰), SQL을 실행하여 생성된 결과를 가상테이블로 정의
+    뷰 생성 : CREATE VIEW [view 이름]
+			AS [SQL쿼리];
+	뷰 삭제 : DROP VIEW [view 이름]
+	※※ 뷰 생성시 권한을 할당 받아야한다.
+*******************************************************************/
+SELECT *
+FROM information_schema.views
+WHERE TABLE_SCHEMA = 'hrdb2019';
+
+-- 부서 총급여가 30000 이상인 테이블 생성
+CREATE VIEW view_salary_sum
+as SELECT e.emp_id, e.emp_name, e.salary, e.dept_id, d.dept_name, t.sum, t.avg
+FROM employee e, department d, 
+		(SELECT dept_id, sum(salary) AS sum, avg(salary) AS avg
+					FROM employee
+					GROUP BY dept_id
+                    HAVING sum >= 30000) t
+WHERE e.dept_id = d.dept_id 
+AND e.dept_id = t.dept_id;
+
+-- view_salary_sum 실행
+SELECT *
+FROM view_salary_sum;
+
+-- view_salary_sum 삭제
+DROP VIEW view_salary_sum;
+
+-- view 확인
+SELECT *
+FROM information_schema.views
+WHERE TABLE_SCHEMA = 'hrdb2019';
+
